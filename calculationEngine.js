@@ -1,102 +1,90 @@
-// calculationEngine.js - Handles dynamic calculations in Tabulator
-
-class CalculationEngine {
+export default class CalculationEngine {
     constructor() {
-        this.tables = {}; // Store references to all Tabulator instances
+        this.tables = {}; // Store registered tables
     }
 
-    /**
-     * Registers a Tabulator instance for calculation references.
-     * Automatically applies calculations and sets up event listeners.
-     * @param {string} name - The table name identifier.
-     * @param {object} instance - The Tabulator instance.
-     */
-    registerTable(name, instance) {
-        this.tables[name] = instance;
-        this.applyCalculations(name); // Run calculations on load
+    // Register a table by ID
+    registerTable(id, table) {
+        this.tables[id] = table;
+        this.initTable(table);
+    }
 
-        // Listen for cell edits and trigger recalculations
-        instance.on("cellEdited", (cell) => {
-            this.applyCalculations(name);
+    // Initialize table calculations
+    initTable(table) {
+        let columns = table.getColumnDefinitions();
+
+        // Extract formulas
+        columns.forEach(col => {
+            if (col.formula) {
+                col.mutator = (value, data, type, params, component) => {
+                    return this.evaluateFormula(col.formula, data, component);
+                };
+            }
+        });
+
+        // Listen for cell edits and trigger updates
+        table.on("cellEdited", cell => {
+            let row = cell.getRow();
+            this.updateRow(row);
+            this.updateDependents(row);
+        });
+
+        // Initial calculation on load
+        table.on("dataLoaded", () => {
+            table.getRows().forEach(row => this.updateRow(row));
         });
     }
 
-    /**
-     * Parses a formula and replaces references with actual values.
-     * Supports:
-     * - "col1 + col2" (same table reference)
-     * - "table2.col3[row=5]" (external table reference)
-     * - "parent.col1" (parent row reference in nested tables)
-     * - "child[0].col2" (first child row reference in nested tables)
-     * @param {string} formula - The formula string to parse.
-     * @param {object} row - The current row instance.
-     * @param {string} tableName - The name of the current table.
-     * @returns {function} - A function that computes the formula.
-     */
-    parseFormula(formula, row, tableName) {
+    // Evaluate formula
+    evaluateFormula(formula, data, component) {
         try {
-            let expression = formula;
+            let row = component.getRow();
+            let parent = row.getTreeParent()?.getData() || {};
+            let children = row.getTreeChildren().map(child => child.getData());
 
-            // Replace references to columns within the same table
-            expression = expression.replace(/(\w+)/g, (match) => {
-                if (row.getData().hasOwnProperty(match)) {
-                    return `parseFloat(row.getData()['${match}']) || 0`;
+            let tables = this.tables;
+            let rowIndex = row.getPosition(true);
+
+            let formulaWithValues = formula.replace(/\b(\w+)\b/g, match => {
+                if (match in data) return data[match]; // Local field
+                if (match === "parent") return parent; // Parent row
+                if (match.startsWith("child[")) {
+                    let childIndex = parseInt(match.match(/\d+/)[0], 10);
+                    return children[childIndex] || {};
+                }
+                if (match.includes(".")) {
+                    let [tableId, field] = match.split(".");
+                    let targetTable = tables[tableId];
+                    if (targetTable) {
+                        let targetRow = targetTable.getRowFromPosition(0, true);
+                        return targetRow ? targetRow.getData()[field] : 0;
+                    }
                 }
                 return match;
             });
 
-            // Replace references to other tables
-            expression = expression.replace(/(\w+)\.(\w+)\[row=(\d+)\]/g, (match, tab, col, index) => {
-                if (this.tables[tab]) {
-                    let targetRow = this.tables[tab].getRowFromPosition(parseInt(index));
-                    return targetRow ? `parseFloat(${targetRow.getData()[col]}) || 0` : '0';
-                }
-                return '0';
-            });
-
-            // Replace references to parent rows
-            expression = expression.replace(/parent\.(\w+)/g, (match, col) => {
-                let parentRow = row.getTreeParent();
-                return parentRow ? `parseFloat(parentRow.getData()['${col}']) || 0` : '0';
-            });
-
-            // Replace references to child rows
-            expression = expression.replace(/child\[(\d+)\]\.(\w+)/g, (match, index, col) => {
-                let children = row.getTreeChildren();
-                return children && children.length > index ? `parseFloat(children[${index}].getData()['${col}']) || 0` : '0';
-            });
-
-            return new Function('row', 'parentRow', 'children', `return ${expression};`);
-        } catch (e) {
-            console.error(`Formula parsing error: ${formula}`, e);
-            return () => 0; // Fallback function
+            return eval(formulaWithValues); // Execute formula safely
+        } catch (error) {
+            console.error(`Formula error in ${formula}:`, error);
+            return null;
         }
     }
 
-    /**
-     * Applies calculations for all rows and columns in a given table.
-     * Runs on table initialization and whenever data changes.
-     * @param {string} tableName - The name of the table.
-     */
-    applyCalculations(tableName) {
-        let table = this.tables[tableName];
-        if (!table) return;
-        
-        table.getRows().forEach(row => {
-            let parentRow = row.getTreeParent();
-            let children = row.getTreeChildren();
-            
-            table.getColumns().forEach(col => {
-                let columnDef = col.getDefinition();
-                if (columnDef.formula) {
-                    let calcFn = this.parseFormula(columnDef.formula, row, tableName);
-                    let newValue = calcFn(row, parentRow, children);
-                    row.update({ [columnDef.field]: newValue });
-                }
-            });
+    // Update a row's calculated values
+    updateRow(row) {
+        row.update(row.getData());
+    }
+
+    // Update dependent rows
+    updateDependents(row) {
+        let children = row.getTreeChildren();
+        children.forEach(child => {
+            this.updateRow(child);
+            this.updateDependents(child);
         });
     }
 }
 
+// Create a singleton instance
 const calcEngine = new CalculationEngine();
 export default calcEngine;
