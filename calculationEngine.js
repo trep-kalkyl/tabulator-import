@@ -84,3 +84,7 @@ export default class CalculationEngine {
 // Create a singleton instance
 const calcEngine = new CalculationEngine();
 export default calcEngine;
+
+// Create a singleton instance
+const calcEngine = new CalculationEngine();
+export default calcEngine;
