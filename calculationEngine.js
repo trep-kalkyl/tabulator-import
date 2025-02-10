@@ -40,7 +40,8 @@ export default class CalculationEngine {
     evaluateFormula(formula, data, component) {
         try {
             let row = component.getRow();
-            let parent = row.getTreeParent()?.getData() || {};
+            let parentRow = row.getTreeParent();
+            let parent = parentRow ? parentRow.getData() : {}; // Avoid error if no parent
             let children = row.getTreeChildren().map(child => child.getData());
 
             let tables = this.tables;
