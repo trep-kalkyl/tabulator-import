@@ -16,6 +16,12 @@ function evaluateExpression(expression, data) {
     }
 }
 
+// Custom mutator for calculations
+function calculationMutator(value, data, type, params, component) {
+    const expression = params.expression; // Get the expression from column definition
+    return evaluateExpression(expression, data);
+}
+
 // Function to update dependent cells
 function updateDependentCells(table, cell, expression) {
     const data = cell.getData();
