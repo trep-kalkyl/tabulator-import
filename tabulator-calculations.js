@@ -1,5 +1,3 @@
-// tabulator-calculations.js
-
 // Function to evaluate mathematical expressions
 function evaluateExpression(expression, data) {
     try {
@@ -20,29 +18,4 @@ function evaluateExpression(expression, data) {
 function calculationMutator(value, data, type, params, component) {
     const expression = params.expression; // Get the expression from column definition
     return evaluateExpression(expression, data);
-}
-
-// Function to update dependent cells
-function updateDependentCells(table, cell, expression) {
-    const data = cell.getData();
-    const result = evaluateExpression(expression, data);
-
-    if (result !== null) {
-        cell.setValue(result);
-    }
-}
-
-// Function to setup reactive calculations
-function setupReactiveCalculations(table) {
-    table.on("dataChanged", (data) => {
-        data.forEach((row) => {
-            table.getColumns().forEach((column) => {
-                const columnDefinition = column.getDefinition();
-                if (columnDefinition.calculation) {
-                    const cell = table.getCell(row, column.getField());
-                    updateDependentCells(table, cell, columnDefinition.calculation);
-                }
-            });
-        });
-    });
 }
