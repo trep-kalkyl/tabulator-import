@@ -41,30 +41,4 @@ function setupReactiveCalculations(table) {
     });
 }
 
-// Initialize Tabulator
-document.addEventListener("DOMContentLoaded", () => {
-    const table = new Tabulator("#example-table", {
-        data: [
-            { id: 1, a: 10, b: 20, c: 30, d: 40, e: 50 },
-            { id: 2, a: 15, b: 25, c: 35, d: 45, e: 55 },
-        ],
-        columns: [
-            { title: "ID", field: "id" },
-            { title: "A", field: "a", editor: "number" },
-            { title: "B", field: "b", editor: "number" },
-            { title: "C", field: "c", editor: "number" },
-            { title: "D", field: "d", editor: "number" },
-            { title: "E", field: "e", editor: "number" },
-            {
-                title: "Result",
-                field: "result",
-                calculation: "a + b + c * d / e", // Example calculation
-                formatter: "number",
-                formatterParams: { precision: 2 },
-            },
-        ],
-        reactiveData: true, // Enable reactive data updates
-    });
 
-    setupReactiveCalculations(table);
-});
