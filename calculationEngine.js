@@ -3,39 +3,40 @@ export default class CalculationEngine {
         this.tables = {}; // Store registered tables
     }
 
-    // Register a table by ID
+    // Register a table and process formulas
     registerTable(id, table) {
         this.tables[id] = table;
-        this.initTable(table);
+        this.processFormulas(table);
     }
 
-    // Initialize table calculations
-    initTable(table) {
+    // Process formulas and assign mutators
+    processFormulas(table) {
         let columns = table.getColumnDefinitions();
+        let hasFormulas = false;
 
-        // Extract formulas
         columns.forEach(col => {
             if (col.formula) {
+                hasFormulas = true;
                 col.mutator = (value, data, type, params, component) => {
                     return this.evaluateFormula(col.formula, data, component);
                 };
             }
         });
 
-        // Listen for cell edits and trigger updates
-        table.on("cellEdited", cell => {
-            let row = cell.getRow();
-            this.updateRow(row);
-            this.updateDependents(row);
-        });
+        if (hasFormulas) {
+            // Ensure reactivity by updating on cell edits
+            table.on("cellEdited", cell => {
+                this.updateTable(table);
+            });
 
-        // Initial calculation on load
-        table.on("dataLoaded", () => {
-            table.getRows().forEach(row => this.updateRow(row));
-        });
+            // Ensure calculations run on data load
+            table.on("dataLoaded", () => {
+                this.updateTable(table);
+            });
+        }
     }
 
-    // Evaluate formula
+    // Evaluate formula dynamically
     evaluateFormula(formula, data, component) {
         try {
             let row = component.getRow();
@@ -45,6 +46,7 @@ export default class CalculationEngine {
             let tables = this.tables;
             let rowIndex = row.getPosition(true);
 
+            // Replace placeholders with real values
             let formulaWithValues = formula.replace(/\b(\w+)\b/g, match => {
                 if (match in data) return data[match]; // Local field
                 if (match === "parent") return parent; // Parent row
@@ -70,17 +72,10 @@ export default class CalculationEngine {
         }
     }
 
-    // Update a row's calculated values
-    updateRow(row) {
-        row.update(row.getData());
-    }
-
-    // Update dependent rows
-    updateDependents(row) {
-        let children = row.getTreeChildren();
-        children.forEach(child => {
-            this.updateRow(child);
-            this.updateDependents(child);
+    // Update all rows in a table
+    updateTable(table) {
+        table.getRows().forEach(row => {
+            row.update(row.getData());
         });
     }
 }
